@@ -1,13 +1,18 @@
 import { json, LoaderFunction } from "@remix-run/node";
-import { useQuery } from "@tanstack/react-query";
-import { useLoaderData, useSearchParams } from "@remix-run/react";
+import { useQuery, dehydrate, QueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "@remix-run/react";
 
 export const loader: LoaderFunction = async ({ request }) => {
+  const queryClient = new QueryClient()
   const url = new URL(request.url);
   const idx = url.searchParams.get("idx") || "1";
-  const response = await fetch(`https://pokeapi.co/api/v2/pokemon/${idx}`);
-  const data = await response.json();
-  return json(data);
+  queryClient.prefetchQuery({
+    queryKey: ["PokeAPI", idx],
+    queryFn: () => fetchPokeAPI(parseInt(idx)),
+    staleTime: 5000,
+    gcTime: 6000,
+  })
+  return json({ dehydratedState: dehydrate(queryClient) })
 };
 
 const fetchPokeAPI = async (idx: number) => {
@@ -19,15 +24,9 @@ const fetchPokeAPI = async (idx: number) => {
 export default function Index() {
   const [searchParams, setSearchParams] = useSearchParams();
   const idx = parseInt(searchParams.get("idx") || "1", 10);
-
-  console.log("useLoaderData: ", useLoaderData())
-
   const { data, isFetching } = useQuery({
     queryKey: ["PokeAPI", idx],
-    queryFn: () => fetchPokeAPI(idx),
-    initialData: useLoaderData(),
-    staleTime: 10000,
-    gcTime: 20000,
+    queryFn: () => fetchPokeAPI(idx)
   });
 
   if (isFetching) {
@@ -42,7 +41,6 @@ export default function Index() {
     setSearchParams({ idx: String(idx + 1) });
   };
 
-  console.log(data);
   return (
     <div style={{ fontFamily: "system-ui, sans-serif", lineHeight: "1.8" }}>
       <div>
